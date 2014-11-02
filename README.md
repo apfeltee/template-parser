@@ -1,5 +1,5 @@
 
-a repository containing idiomatic ASP-style template parsers.
+a repository containing idiomatic ASP-style template parsers.\\
 these parsers use plain, old, manual parsing. no regular expressions involved!
 
 root-impl is the C++-version, in 'c++/', most other are deriatives of that one.
@@ -12,6 +12,8 @@ License: not sure yet, but I guess public domain. ask me if you have any questio
 
 More implementations may follow eventually.
 
+---
+
 Supported Syntax:
 
  + Code blocks:
@@ -20,11 +22,11 @@ Supported Syntax:
             ...
         <% end %>
 
-  + Code lines (i.e., expression that evaluate to some sort of printable value):
+ + Code lines (i.e., expression that evaluate to some sort of printable value):
 
         <%= thing %>
 
-   + Comment blocks (these are skipped):
+ + Comment blocks (these are skipped):
 
         <%# nobody will ever find out about my dark secret! %>
 
