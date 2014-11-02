@@ -1,26 +1,36 @@
 
-local trim = function(str)
+
+
+local Template = {}
+Template.Utils = {}
+Template.__index = Template
+
+-- utility functions starts here
+Template.Utils.trim = function(str)
     return (str:match('^()%s*$') and '' or str:match('^%s*(.*%S)'))
 end
 
-local Template = {}
-Template.__index = Template
-
+-- Template class impl starts here
 function Template.new(input)
     local self = {}
     setmetatable(self, Template)
-    self.input = input
+    self.buffer = {}
+    self.input  = input
 
     -- default filter function
     -- if this function returns nil, then no further data is appended
     -- to the buffer.
     -- this impl merely checks if the string isn't just useless whitespace
-    self.fn_filter = function(src)
-        local nstring = trim(src)
+    self.fn_filter = function(src, is_code)
+        local nstring = Template.Utils.trim(src)
         if string.len(nstring) == 0 then
             return nil
         else
-            return nstring
+            if is_code then
+                return nstring
+            else
+                return src
+            end
         end
     end
 
@@ -42,15 +52,14 @@ function Template.new(input)
     return self
 end
 
-function Template:call_cb(fn, str)
-    local newstr = self.fn_filter(str)
+function Template:call_cb(fn, str, is_code)
+    local newstr = self.fn_filter(str, is_code)
     if (newstr ~= nil) then
         -- use 'newstr' to get trimmed output
-        return fn(str)
+        return fn(newstr)
     end
     return ""
 end
-
 
 function Template:filter(fn)
    self.fn_filter = fn
@@ -68,13 +77,21 @@ function Template:on_data(self, fn)
     self.fn_on_data = fn
 end
 
+function Template:data()
+    return self.buffer
+end
 
+function Template:str()
+    return table.concat(self:data(), "")
+end
+
+-- TODO: string concatenation typically leads to VERY bad performance, due to the
+-- fact that lua has to copy the whole string with every operation, so use tables instead.
 function Template:parse()
     -- remember that Lua is 1-index based (sigh) ...
     -- oh, and that Lua's builtin strings don't understand index operations (i.e., src[ci]),
     -- but won't error() about it, and just return nil. it's infuriating.
     local ci = 1
-    local buf = ""
     local src = self.input
     local srclen = string.len(src)
     while (ci < srclen) do
@@ -91,11 +108,11 @@ function Template:parse()
             end
             if (string.sub(chunk, 1, 1) == '=') then
                 chunk = string.sub(chunk, 2, string.len(chunk))
-                buf = buf .. self:call_cb(self.fn_on_codeline, chunk)
+                table.insert(self.buffer, self:call_cb(self.fn_on_codeline, chunk, true))
             elseif (string.sub(chunk, 1, 1) == '#') then
                 -- skip comments by doing nothing successfully
             else
-                buf = buf .. self:call_cb(self.fn_on_codeblock, chunk)
+                table.insert(self.buffer, self:call_cb(self.fn_on_codeblock, chunk, true))
             end
             chunk = ""
         else
@@ -106,11 +123,11 @@ function Template:parse()
                 chunk = chunk .. string.sub(src, ci, ci)
                 ci = ci + 1
             end
-            buf = buf .. self:call_cb(self.fn_on_data, chunk)
+            table.insert(self.buffer, self:call_cb(self.fn_on_data, chunk, false))
             chunk = ""
         end
     end
-    return buf
+    return self:str()
 end
 
 return Template
