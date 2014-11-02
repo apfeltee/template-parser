@@ -2,30 +2,60 @@
 #include <stdlib.h>
 #include "tpl.h"
 
-static void tplparser_default_on_codeblock(TemplateParser* tpl, const char* chunk, size_t len, void* p)
+#if _DEBUG
+    #define compare(name, str, len) \
+        { \
+            size_t slen = strlen(str); \
+            fprintf(stderr, "%s: len(%d) == strlen(%d) = %s\n", \
+                name, len, slen, ((len == slen) ? "ok!" : "nope!") \
+            ); \
+        }
+#else
+    #define compare(name, str, len)
+#endif
+
+static bool default_filter(TemplateParser* tpl, char* chunk, size_t len, void* p)
 {
-    (void)len;
+    (void)tpl;
+    (void)chunk;
     (void)p;
-    strcat(tpl->result, chunk);
-    strcat(tpl->result, ";\n");
+    if(len > 0)
+    {
+        return true;
+    }
+    return false;
 }
 
-static void tplparser_default_on_codeline(TemplateParser* tpl, const char* chunk, size_t len, void* p)
+static bool default_on_codeblock(TemplateParser* tpl, char* chunk, size_t len, void* p)
 {
     (void)len;
     (void)p;
+    compare("on_codeblock", chunk, len);
+    strcat(tpl->result, chunk);
+    strcat(tpl->result, ";\n");
+    return true;
+}
+
+static bool default_on_codeline(TemplateParser* tpl, char* chunk, size_t len, void* p)
+{
+    (void)len;
+    (void)p;
+    compare("on_codeline", chunk, len);
     strcat(tpl->result, "print(");
     strcat(tpl->result, chunk);
     strcat(tpl->result, ");\n");
+    return true;
 }
 
-static void tplparser_default_on_data(TemplateParser* tpl, const char* chunk, size_t len, void* p)
+static bool default_on_data(TemplateParser* tpl, char* chunk, size_t len, void* p)
 {
     (void)len;
     (void)p;
+    compare("on_data", chunk, len);
     strcat(tpl->result, "print([[");
     strcat(tpl->result, chunk);
     strcat(tpl->result, "]]);\n");
+    return true;
 }
 
 static void chappend(TemplateParser* tpl, char ch)
@@ -49,15 +79,20 @@ static void whenlf(TemplateParser* tpl)
     }
 }
 
-void tplparser_init_l(
+//struct TemplateParser*, const char* chunk, size_t len, void*
+static void call_cb(TemplateParser* tpl, Callback which, char* chunk, size_t len)
+{
+    if(tpl->filterfunc(tpl, chunk, len, tpl->userdata) == true)
+    {
+        which(tpl, chunk, len, tpl->userdata);
+    }
+}
+
+static void setup_vars(
     TemplateParser* tpl,
-    const char* src,
-    size_t srclen,
-    char* buffer,
-    size_t bufsize,
-    char* chunk,
-    size_t chsize
-)
+    const char* src, size_t srclen,
+    char* buffer, size_t bufsize,
+    char* chunk, size_t chsize)
 {
     /* maybe str*dup() would be better here? */
     tpl->src = src;
@@ -70,29 +105,57 @@ void tplparser_init_l(
     tpl->ci = 0;
     tpl->line = 1;
     tpl->column = 1;
-    tplparser_set_on_codeblock(tpl, tplparser_default_on_codeblock);
-    tplparser_set_on_codeline(tpl, tplparser_default_on_codeline);
-    tplparser_set_on_data(tpl, tplparser_default_on_data);
+    tplparser_set_filterfunc(tpl, default_filter);
+    tplparser_set_on_codeblock(tpl, default_on_codeblock);
+    tplparser_set_on_codeline(tpl, default_on_codeline);
+    tplparser_set_on_data(tpl, default_on_data);
     tplparser_set_userdata(tpl, NULL);
     memset(tpl->result, 0, tpl->bufsize);
+    memset(tpl->chunk, 0, tpl->chunksize);
+}
+
+void tplparser_init_l(
+    TemplateParser* tpl,
+    const char* src,
+    size_t srclen,
+    char* buffer,
+    size_t bufsize,
+    char* chunk,
+    size_t chsize)
+{
+    setup_vars(tpl, src, srclen, buffer, bufsize, chunk, chsize);
+    tpl->is_heapmem = false;
 }
 
 void tplparser_init(
     TemplateParser* tpl,
     const char* src,
-    char* buffer,
+    size_t srclen,
     size_t bufsize,
-    char* chunk,
-    size_t chunksize
-)
+    size_t chunksize)
 {
-    tplparser_init_l(tpl, src, strlen(src), buffer, bufsize, chunk, chunksize);
+    char* buffer;
+    char* chunk;
+    buffer = (char*)malloc(bufsize + 1);
+    chunk = (char*)malloc(chunksize + 1);
+    setup_vars(tpl, src, srclen, buffer, bufsize, chunk, chunksize);
+    tpl->is_heapmem = true;
 }
 
 void tplparser_fini(TemplateParser* tpl)
 {
-    (void)tpl;
-    /* nothing to do for now */
+    if(tpl->is_heapmem == true)
+    {
+        free(tpl->result);
+        free(tpl->chunk);
+        tpl->result = NULL;
+        tpl->chunk = NULL;
+    }
+}
+
+void tplparser_set_filterfunc(TemplateParser* tpl, Callback fn)
+{
+    tpl->filterfunc = fn;
 }
 
 void tplparser_set_on_codeblock(TemplateParser* tpl, Callback fn)
@@ -117,34 +180,55 @@ void tplparser_set_userdata(TemplateParser* tpl, void* p)
 
 void tplparser_parse(TemplateParser* tpl)
 {
+    bool in_code;
+    bool was_eod;
+    size_t len;
     const char* src;
+    in_code = false;
+    was_eod = false;
+    len = 0;
     src = tpl->src;
     while((tpl->ci) < (tpl->srclen))
     {
         if((src[tpl->ci] == '<') && (src[tpl->ci + 1] == '%'))
         {
+            in_code = true;
             tpl->ci += 2;
             while(1)
             {
                 whenlf(tpl);
-                if((src[tpl->ci] == '%') && (src[tpl->ci + 1] == '>'))
+                if((tpl->ci >= tpl->srclen) || ((src[tpl->ci] == '%') && (src[tpl->ci + 1] == '>')))
                 {
-                    tpl->ci += 2;
+                    if((tpl->ci) < (tpl->srclen))
+                    {
+                        tpl->ci += 2;
+                    }
+                    else
+                    {
+                        was_eod = true;
+                    }
+                    in_code = false;
                     break;
                 }
                 chappend(tpl, src[tpl->ci]);
+                len++;
                 tpl->ci++;
                 tpl->column++;
             }
             if(tpl->chunk[0] == '=')
             {
-                tpl->on_codeline(tpl, tpl->chunk + 1, 0);
+                call_cb(tpl, tpl->on_codeline, tpl->chunk + 1, len - 1);
+            }
+            else if(tpl->chunk[0] == '#')
+            {
+                /* do nothing */
             }
             else
             {
-                tpl->on_codeblock(tpl, tpl->chunk, 0);
+                call_cb(tpl, tpl->on_codeblock, tpl->chunk, len);
             }
             chclear(tpl);
+            len = 0;
         }
         else
         {
@@ -156,11 +240,13 @@ void tplparser_parse(TemplateParser* tpl)
                     break;
                 }
                 chappend(tpl, src[tpl->ci]);
+                len++;
                 tpl->ci++;
                 tpl->column++;
             }
-            tpl->on_data(tpl, tpl->chunk, 0);
+            call_cb(tpl, tpl->on_data, tpl->chunk, len);
             chclear(tpl);
+            len = 0;
         }
     }
 }

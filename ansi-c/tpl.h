@@ -1,14 +1,27 @@
 
+/*
+simple usage example:
+
+    TemplateParser tpl;
+    const char* str = "hello, <%=get_username()%>";
+    tplparser_init(&tpl, str, strlen(str), 1024 * 10, 1024 * 4);
+    tplparser_parse(&tpl);
+    // 'tpl.result' now contains the generated code
+    puts(tpl.result);
+    tplparser_fini(&tpl);
+*/
+
 #pragma once
 
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 struct TemplateParser;
 
 /* callback type */
-typedef void(*Callback)(struct TemplateParser* tpl, const char* chunk, size_t len, void*);
+typedef bool(*Callback)(struct TemplateParser*, char*, size_t, void*);
 
 struct TemplateParser
 {
@@ -20,6 +33,12 @@ struct TemplateParser
 
     /* called on everything else */
     Callback on_data;
+
+    /* called to filter data (if defined). if it returns false, the data is omitted. */
+    Callback filterfunc;
+
+    /* whether $chunk and $result have been malloc'd */
+    bool is_heapmem;
 
     /* userdata pointer passed to Callback functions */
     void* userdata;
@@ -57,7 +76,7 @@ struct TemplateParser
 
 typedef struct TemplateParser TemplateParser;
 
-/* initiate a TemplateParser instance. */
+/* initiate a new TemplateParser instance with $buffer and $chunk preallocated */
 extern void tplparser_init_l(
     /* reference to a TemplateParser struct. see example.c! */
     TemplateParser* tpl,
@@ -65,31 +84,33 @@ extern void tplparser_init_l(
     const char* src,
     /* length of input string*/
     size_t srclen,
-    /* buffer to write the template to */
+    /* buffer ref to write the template to */
     char* buffer,
     /* size of buffer */
     size_t bufsize,
-    /* chunk for intermediate data */
+    /* chunk ref to write intermediate data to */
     char* chunk,
     /* size of chunk */
-    size_t chunksize
+    size_t chsize
 );
 
-/* calls tplparser_init_l, using strlen() to provide $srclen */
+/* same as tplparser_init_l, but uses malloc() to provide buffer and chunk */
 extern void tplparser_init(
     TemplateParser* tpl,
     const char* src,
-    char* buffer,
+    size_t srclen,
     size_t bufsize,
-    char* chunk,
     size_t chunksize
 );
+
 
 /* de-initializes a TemplateParser instance */
 extern void tplparser_fini(TemplateParser* tpl);
 
 /* sets a userdata pointer for Callback functions */
 extern void tplparser_set_userdata(TemplateParser* tpl, void* p);
+
+void tplparser_set_filterfunc(TemplateParser* tpl, Callback fn);
 
 /* set callback for codeblocks (i.e., <% if foo then bar end %>)*/
 extern void tplparser_set_on_codeblock(TemplateParser* tpl, Callback fn);

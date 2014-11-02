@@ -12,25 +12,41 @@ enum ConstVars
 const char* example = STR
 (
     Hello, <%= CurrentUser.getUsername() %>!
-
+    <%# another comment
+    over
+    several
+    lines%>
     <h2>Current Entries:</h2>
     <ul>
         <% for itm in Storage.getEntries() do %>
-            <li>
-                <%= itm.name() %>
-            </li>
+            <%# this is also a comment %>
+            <% if itm.isOwnedBy(<CurrentUser>) then %>
+                <li>
+                    <%= itm.name() %>
+                </li>
+            <% end %>
         <% end %>
     </ul>
 );
 
 int main()
 {
-    char buffer[bufsize + 1];
-    char chunk[chunksize + 1];
-    TemplateParser tpl;
-    tplparser_init(&tpl, example, buffer, bufsize, chunk, chunksize);
-    tplparser_parse(&tpl);
-    printf("result:\n%s\n", tpl.result);
-    tplparser_fini(&tpl);
+    {
+        TemplateParser tpl;
+        const char* str = "hello, <%=get_username()%>!";
+        tplparser_init(&tpl, str, strlen(str), 1024 * 10, 1024 * 4);
+        tplparser_parse(&tpl);
+        // 'tpl.result' now contains the generated code
+        puts(tpl.result);
+        tplparser_fini(&tpl);
+    }
+    puts("-----");
+    {
+        TemplateParser tpl;
+        tplparser_init(&tpl, example, strlen(example), bufsize, chunksize);
+        tplparser_parse(&tpl);
+        printf("result:\n%s\n", tpl.result);
+        tplparser_fini(&tpl);
+    }
 }
 
