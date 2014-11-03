@@ -14,6 +14,16 @@
     #define compare(name, str, len)
 #endif
 
+#define call_oncodeline(tpl, chunk, len) \
+    call_cb(tpl, tpl->on_codeline, chunk, len)
+
+#define call_oncodeblock(tpl, chunk, len) \
+    call_cb(tpl, tpl->on_codeblock, chunk, len)
+
+#define call_ondata(tpl, chunk, len) \
+    call_cb(tpl, tpl->on_data, chunk, len)
+
+
 static bool default_filter(TemplateParser* tpl, char* chunk, size_t len, void* p)
 {
     (void)tpl;
@@ -79,7 +89,6 @@ static void whenlf(TemplateParser* tpl)
     }
 }
 
-//struct TemplateParser*, const char* chunk, size_t len, void*
 static void call_cb(TemplateParser* tpl, Callback which, char* chunk, size_t len)
 {
     if(tpl->filterfunc(tpl, chunk, len, tpl->userdata) == true)
@@ -87,6 +96,8 @@ static void call_cb(TemplateParser* tpl, Callback which, char* chunk, size_t len
         which(tpl, chunk, len, tpl->userdata);
     }
 }
+
+
 
 static void setup_vars(
     TemplateParser* tpl,
@@ -217,7 +228,7 @@ void tplparser_parse(TemplateParser* tpl)
             }
             if(tpl->chunk[0] == '=')
             {
-                call_cb(tpl, tpl->on_codeline, tpl->chunk + 1, len - 1);
+                call_oncodeline(tpl, tpl->chunk + 1, len - 1);
             }
             else if(tpl->chunk[0] == '#')
             {
@@ -225,7 +236,7 @@ void tplparser_parse(TemplateParser* tpl)
             }
             else
             {
-                call_cb(tpl, tpl->on_codeblock, tpl->chunk, len);
+                call_oncodeblock(tpl, tpl->chunk, len);
             }
             chclear(tpl);
             len = 0;
@@ -244,7 +255,7 @@ void tplparser_parse(TemplateParser* tpl)
                 tpl->ci++;
                 tpl->column++;
             }
-            call_cb(tpl, tpl->on_data, tpl->chunk, len);
+            call_ondata(tpl, tpl->chunk, len);
             chclear(tpl);
             len = 0;
         }

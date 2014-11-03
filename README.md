@@ -40,6 +40,7 @@ Approximate API Pseudocode (if you plan to add your implementation, read this pa
             self.input = input
         }
 
+        /**
         function setFilter(function fn)
         {
             self.m_filter = fn
@@ -65,3 +66,54 @@ Approximate API Pseudocode (if you plan to add your implementation, read this pa
             /* magic happens here. once done, return the result as string */
         }
     }
+
+---
+
+Already implemented:
+
+ + C++ (uses C++11! the future is now)
+
+ + ANSI-c (no dynamic storage. should be relatively trivial to add, though)
+
+ + Lua (even uses tables as buffer, hot damn)
+
+ + Perl (doesn't work. feel free to fix it)
+
+ + TCL (ergo, but yours to fix it)
+
+In progress:
+
+ + Ruby
+
+ + Javascript
+
+ + Go
+
+ + PHP (it was bound to happen sooner or later)
+
+ + Python
+
+ + Java
+
+ + C#
+
+Planned:
+
+ + Ocaml (or rather, SML)
+
+ + Pascal (delphi-esque, will be using FreePascal)
+
+ + BASIC (using FreeBASIC)
+
+ + Bash (why not? :D)
+
+ + Rexx (big fat emphasis on "maybe")
+ 
+
+Wanted languages:
+
+ + Haskell (never bothered to learn it)
+
+ + Lisp (same as with haskell, also be as standards-compliant as possible)
+
+ + 

@@ -11,6 +11,7 @@ enum ConstVars
 
 const char* example = STR
 (
+    <% header("Content-Type: text/html"); %>
     Hello, <%= CurrentUser.getUsername() %>!
     <%# another comment
     over

@@ -1,6 +1,4 @@
 
-
-
 local Template = {}
 Template.Utils = {}
 Template.__index = Template
