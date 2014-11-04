@@ -46,7 +46,8 @@ int main()
         TemplateParser tpl;
         tplparser_init(&tpl, example, strlen(example), bufsize, chunksize);
         tplparser_parse(&tpl);
-        printf("result:\n%s\n", tpl.result);
+        //printf("result:\n%s\n", tpl.result);
+        puts("result:"); puts(tpl.result); puts("");
         tplparser_fini(&tpl);
     }
 }

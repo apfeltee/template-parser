@@ -106,6 +106,7 @@ static void setup_vars(
     char* chunk, size_t chsize)
 {
     /* maybe str*dup() would be better here? */
+    tpl->is_heapmem = false;
     tpl->src = src;
     tpl->chunk = chunk;
     tpl->srclen = srclen;
@@ -149,6 +150,8 @@ void tplparser_init(
     char* chunk;
     buffer = (char*)malloc(bufsize + 1);
     chunk = (char*)malloc(chunksize + 1);
+    memset(buffer, 0, bufsize);
+    memset(chunk, 0, chunksize);
     setup_vars(tpl, src, srclen, buffer, bufsize, chunk, chunksize);
     tpl->is_heapmem = true;
 }
